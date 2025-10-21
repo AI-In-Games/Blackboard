@@ -1,0 +1,386 @@
+/* Blackboard Editor Styles - Production Quality */
+
+/* CSS Variables */
+:root {
+    /* Button colors */
+    --blackboard-color-button-primary: #4a9eff;
+    --blackboard-color-button-primary-hover: #3a8eef;
+    --blackboard-color-button-primary-active: #2a7edf;
+    --blackboard-color-button-text: white;
+
+    /* Focus colors */
+    --blackboard-color-focus-bg: rgba(255, 255, 255, 0.1);
+    --blackboard-color-focus-border: #4a9eff;
+
+    /* Interactive element colors */
+    --blackboard-color-hover-overlay: rgba(255, 255, 255, 0.05);
+    --blackboard-color-active-overlay: rgba(255, 255, 255, 0.1);
+
+    /* Dark theme specific */
+    --blackboard-color-dark-header-bg: #2a2a2a;
+    --blackboard-color-dark-entry-bg: #1e1e1e;
+    --blackboard-color-dark-entry-hover: #252525;
+    --blackboard-color-dark-delete: rgba(200, 200, 200, 0.8);
+    --blackboard-color-dark-delete-hover: rgba(255, 255, 255, 1);
+
+    /* Light theme specific */
+    --blackboard-color-light-header-bg: #f5f5f5;
+    --blackboard-color-light-entry-bg: #ffffff;
+    --blackboard-color-light-entry-hover: #f9f9f9;
+    --blackboard-color-light-delete: rgba(100, 100, 100, 0.8);
+    --blackboard-color-light-delete-hover: rgba(50, 50, 50, 1);
+
+    /* Status colors */
+    --blackboard-color-status-playmode: #ffcc66;
+    --blackboard-color-status-active: #66cc66;
+    --blackboard-color-status-inactive: #999999;
+    --blackboard-color-status-dark: #cccccc;
+    --blackboard-color-status-light: #555555;
+    --blackboard-color-status-playmode-light: #cc8800;
+    --blackboard-color-status-active-light: #228822;
+    --blackboard-color-status-inactive-light: #777777;
+}
+
+.blackboard-header {
+    background-color: var(--blackboard-color-bg-elevated);
+    padding: var(--blackboard-spacing-lg);
+    margin-bottom: var(--blackboard-spacing-md);
+    border-radius: var(--blackboard-radius-md);
+    border-bottom-width: 2px;
+    border-bottom-color: var(--blackboard-color-accent);
+}
+
+.blackboard-title {
+    font-size: 18px;
+    -unity-font-style: bold;
+    color: var(--blackboard-color-text-primary);
+    margin-bottom: var(--blackboard-spacing-xs);
+}
+
+.blackboard-subtitle {
+    font-size: 12px;
+    color: var(--blackboard-color-text-secondary);
+    -unity-font-style: italic;
+}
+
+.parent-container {
+    margin: var(--blackboard-spacing-md) 0;
+    padding: var(--blackboard-spacing-md);
+    background-color: var(--blackboard-color-bg);
+    border-radius: var(--blackboard-radius-sm);
+    border-width: 1px;
+    border-color: var(--blackboard-color-border);
+}
+
+.add-key-button {
+    width: 24px;
+    height: 24px;
+    background-color: var(--blackboard-color-button-primary);
+    color: var(--blackboard-color-button-text);
+    border-radius: 3px;
+    border-width: 0;
+    font-size: 16px;
+    -unity-text-align: middle-center;
+    margin: 4px 0;
+    padding: 0;
+    align-self: flex-end;
+}
+
+.add-key-button:hover {
+    background-color: var(--blackboard-color-button-primary-hover);
+}
+
+.add-key-button:active {
+    background-color: var(--blackboard-color-button-primary-active);
+}
+
+.key-name-edit {
+    flex-grow: 1;
+    min-width: 120px;
+    -unity-font-style: bold;
+}
+
+.key-name-edit > .unity-text-field__input {
+    background-color: transparent;
+    border-width: 0;
+    padding: 0;
+}
+
+.key-name-edit > .unity-text-field__input:focus {
+    background-color: var(--blackboard-color-focus-bg);
+    border-width: 1px;
+    border-color: var(--blackboard-color-focus-border);
+    border-radius: 2px;
+    padding: 2px;
+}
+
+.entries-list-container {
+    margin-top: var(--blackboard-spacing-md);
+}
+
+.list-header {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: var(--blackboard-color-text-primary);
+    margin-bottom: var(--blackboard-spacing-sm);
+    padding: var(--blackboard-spacing-sm) 0;
+    border-bottom-width: 2px;
+    border-bottom-color: var(--blackboard-color-border);
+}
+
+.section-header {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: var(--blackboard-color-text-primary);
+    margin-top: var(--blackboard-spacing-md);
+    margin-bottom: var(--blackboard-spacing-sm);
+    padding: var(--blackboard-spacing-xs) 0;
+    opacity: 0.8;
+}
+
+.inherited-section-header {
+    opacity: 0.6;
+    -unity-font-style: italic;
+}
+
+.empty-state {
+    -unity-text-align: middle-center;
+    color: var(--blackboard-color-text-secondary);
+    font-size: 14px;
+    -unity-font-style: italic;
+    padding: var(--blackboard-spacing-xl);
+    opacity: 0.6;
+}
+
+.blackboard-entry {
+    background-color: var(--blackboard-color-bg);
+    border-radius: var(--blackboard-radius-sm);
+    padding: var(--blackboard-spacing-md);
+    margin-bottom: var(--blackboard-spacing-sm);
+    border-width: 1px;
+    border-color: var(--blackboard-color-border);
+    transition: var(--blackboard-transition-all);
+}
+
+.blackboard-entry:hover {
+    background-color: var(--blackboard-color-bg-hover);
+    border-color: var(--blackboard-color-accent);
+}
+
+.blackboard-entry-inherited {
+    opacity: 0.7;
+    border-style: dashed;
+}
+
+.blackboard-entry-inherited:hover {
+    opacity: 0.85;
+}
+
+.entry-header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: var(--blackboard-spacing-sm);
+}
+
+.key-label {
+    flex-grow: 1;
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: var(--blackboard-color-text-primary);
+}
+
+.type-label {
+    font-size: 11px;
+    color: var(--blackboard-color-text-secondary);
+    background-color: var(--blackboard-color-bg-elevated);
+    padding: 2px 8px;
+    border-radius: var(--blackboard-radius-xs);
+    -unity-text-align: middle-center;
+}
+
+.delete-button {
+    width: 20px;
+    height: 20px;
+    background-color: transparent;
+    border-width: 0;
+    font-size: 14px;
+    -unity-text-align: middle-center;
+    padding: 2px;
+    margin: 0 4px 0 0;
+    opacity: 0.6;
+}
+
+.delete-button:hover {
+    opacity: 1;
+    background-color: var(--blackboard-color-hover-overlay);
+}
+
+.delete-button:active {
+    opacity: 0.8;
+    background-color: var(--blackboard-color-active-overlay);
+}
+
+/* Dark theme */
+.unity-theme-dark .delete-button {
+    color: var(--blackboard-color-dark-delete);
+}
+
+.unity-theme-dark .delete-button:hover {
+    color: var(--blackboard-color-dark-delete-hover);
+}
+
+/* Light theme */
+.unity-theme-light .delete-button {
+    color: var(--blackboard-color-light-delete);
+}
+
+.unity-theme-light .delete-button:hover {
+    color: var(--blackboard-color-light-delete-hover);
+}
+
+.value-field {
+    margin-top: var(--blackboard-spacing-xs);
+}
+
+/* Dark Theme Overrides */
+.unity-theme-dark .blackboard-header {
+    background-color: var(--blackboard-color-dark-header-bg);
+}
+
+.unity-theme-dark .blackboard-entry {
+    background-color: var(--blackboard-color-dark-entry-bg);
+}
+
+.unity-theme-dark .blackboard-entry:hover {
+    background-color: var(--blackboard-color-dark-entry-hover);
+}
+
+/* Light Theme Overrides */
+.unity-theme-light .blackboard-header {
+    background-color: var(--blackboard-color-light-header-bg);
+}
+
+.unity-theme-light .blackboard-entry {
+    background-color: var(--blackboard-color-light-entry-bg);
+}
+
+.unity-theme-light .blackboard-entry:hover {
+    background-color: var(--blackboard-color-light-entry-hover);
+}
+
+/* Runtime Debug Window Styles */
+.debug-window-header {
+    background-color: rgba(0, 0, 0, 0);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--blackboard-color-border);
+}
+
+.debug-window-title {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: var(--blackboard-color-text-primary);
+}
+
+.debug-window-status {
+    font-size: 10px;
+}
+
+.debug-window-status-playmode {
+    color: var(--blackboard-color-status-playmode);
+}
+
+.debug-window-status-active {
+    color: var(--blackboard-color-status-active);
+}
+
+.debug-window-status-inactive {
+    color: var(--blackboard-color-status-inactive);
+}
+
+/* Dark Theme */
+.unity-theme-dark .debug-window-status {
+    color: var(--blackboard-color-status-dark);
+}
+
+.unity-theme-dark .debug-window-status-playmode {
+    color: var(--blackboard-color-status-playmode);
+}
+
+.unity-theme-dark .debug-window-status-active {
+    color: var(--blackboard-color-status-active);
+}
+
+.unity-theme-dark .debug-window-status-inactive {
+    color: var(--blackboard-color-status-inactive);
+}
+
+/* Light Theme */
+.unity-theme-light .debug-window-status {
+    color: var(--blackboard-color-status-light);
+}
+
+.unity-theme-light .debug-window-status-playmode {
+    color: var(--blackboard-color-status-playmode-light);
+}
+
+.unity-theme-light .debug-window-status-active {
+    color: var(--blackboard-color-status-active-light);
+}
+
+.unity-theme-light .debug-window-status-inactive {
+    color: var(--blackboard-color-status-inactive-light);
+}
+
+.entries-container {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.empty-message {
+    padding-top: 10px;
+    padding-left: 10px;
+    color: var(--blackboard-color-text-secondary);
+}
+
+.entry-count-label {
+    -unity-font-style: bold;
+    padding-bottom: 5px;
+    padding-left: 5px;
+    color: var(--blackboard-color-text-primary);
+}
+
+.debug-window-toolbar {
+    flex-direction: row;
+    background-color: var(--blackboard-color-bg);
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--blackboard-color-border);
+}
+
+.toolbar-button {
+    margin-right: 4px;
+}
+
+.toolbar-spacer {
+    flex-grow: 1;
+}
+
+.debug-window-editing-row {
+    flex-direction: row;
+    background-color: var(--blackboard-color-bg);
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--blackboard-color-border);
+}

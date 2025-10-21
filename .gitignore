@@ -1,0 +1,16 @@
+﻿DevProject/.idea
+DevProject/Library
+DevProject/Logs
+DevProject/obj
+DevProject/Temp
+DevProject/UserSettings
+*.csproj
+DevProject/DevProject.sln
+TestProject/TestProject.sln
+TestProject/Library
+TestProject/Temp
+TestProject/Logs
+TestProject/UserSettings
+TestProject/obj
+*.log
+*.xml

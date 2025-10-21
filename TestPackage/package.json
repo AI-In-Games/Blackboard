@@ -1,0 +1,10 @@
+{
+  "name": "com.aiingames.blackboard.tests",
+  "version": "0.0.1",
+  "displayName": "Blackboard Tests",
+  "description": "Test suite for the Blackboard package",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.aiingames.blackboard": "0.0.1"
+  }
+}

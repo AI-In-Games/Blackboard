@@ -1,0 +1,20 @@
+{
+  "name": "com.aiingames.blackboard",
+  "version": "0.0.1",
+  "displayName": "Blackboard",
+  "description": "Type-safe, high-performance blackboard system for Unity. Zero-allocation key-value storage with change notifications, hierarchical scoping, and comprehensive editor support.",
+  "unity": "6000.0",
+  "keywords": [
+    "blackboard",
+    "data",
+    "storage",
+    "ai",
+    "shared data",
+    "key-value"
+  ],
+  "author": {
+    "name": "AiInGames",
+    "email": "aiingames@hotmail.com",
+    "url": "https://aiingames.com"
+  }
+}

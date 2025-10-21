@@ -1,0 +1,18 @@
+{
+  "name": "AiInGames.Blackboard.Editor",
+  "rootNamespace": "AiInGames.Blackboard.Editor",
+  "references": [
+    "AiInGames.Blackboard"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

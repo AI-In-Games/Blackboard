@@ -272,5 +272,20 @@ namespace AiInGames.Blackboard.Tests.Editor.Inspectors
 
             Object.DestroyImmediate(parent);
         }
+
+        [Test]
+        public void OnAnyValueChanged_FiresWhenModifyingAsset()
+        {
+            string changedKey = null;
+
+            m_Blackboard.OnAnyValueChanged += (key) =>
+            {
+                changedKey = key;
+            };
+
+            BlackboardEditorHelper.SetValue(m_Blackboard, "TestKey", typeof(int), 42);
+
+            Assert.AreEqual("TestKey", changedKey);
+        }
     }
 }

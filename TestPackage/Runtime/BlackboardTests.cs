@@ -584,5 +584,61 @@ namespace AiInGames.Blackboard.Tests
             Object.DestroyImmediate(level2);
             Object.DestroyImmediate(level3);
         }
+
+        [Test]
+        public void OnAnyValueChanged_FiresWhenValueChanges()
+        {
+            string changedKey = null;
+            int callbackCount = 0;
+
+            blackboard.OnAnyValueChanged += (key) =>
+            {
+                changedKey = key;
+                callbackCount++;
+            };
+
+            blackboard.SetValue("TestKey", 42);
+
+            Assert.AreEqual("TestKey", changedKey);
+            Assert.AreEqual(1, callbackCount);
+        }
+
+        [Test]
+        public void OnAnyValueChanged_DoesNotFireWhenValueUnchanged()
+        {
+            int callbackCount = 0;
+
+            blackboard.SetValue("TestKey", 42);
+
+            blackboard.OnAnyValueChanged += (key) =>
+            {
+                callbackCount++;
+            };
+
+            blackboard.SetValue("TestKey", 42);
+
+            Assert.AreEqual(0, callbackCount);
+        }
+
+        [Test]
+        public void OnAnyValueChanged_FiresForMultipleKeys()
+        {
+            var changedKeys = new List<string>();
+
+            blackboard.OnAnyValueChanged += (key) =>
+            {
+                changedKeys.Add(key);
+            };
+
+            blackboard.SetValue("Key1", 1);
+            blackboard.SetValue("Key2", "test");
+            blackboard.SetValue("Key3", true);
+
+            Assert.AreEqual(3, changedKeys.Count);
+            Assert.Contains("Key1", changedKeys);
+            Assert.Contains("Key2", changedKeys);
+            Assert.Contains("Key3", changedKeys);
+        }
+
     }
 }

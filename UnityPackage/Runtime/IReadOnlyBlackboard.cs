@@ -8,5 +8,6 @@ namespace AiInGames.Blackboard
         int KeyCount();
         void Subscribe(string key, System.Action callback);
         void Unsubscribe(string key, System.Action callback);
+        event System.Action<string> OnAnyValueChanged;
     }
 }

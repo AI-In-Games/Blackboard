@@ -48,6 +48,8 @@ namespace AiInGames.Blackboard
 
         Dictionary<string, Action> m_ChangeListeners;
 
+        public event Action<string> OnAnyValueChanged;
+
         bool m_IsInitialized;
 
         public Blackboard Parent
@@ -661,11 +663,19 @@ namespace AiInGames.Blackboard
 
         void NotifyChange(string key)
         {
-            if (!m_ChangeListeners.TryGetValue(key, out var callback))
-                return;
+            // Invoke global change listener
+            try
+            {
+                OnAnyValueChanged?.Invoke(key);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("Blackboard global change listener exception:", this);
+                Debug.LogException(ex, this);
+            }
 
-            // GetInvocationList allocates array - acceptable trade-off for exception safety
-            if (callback != null)
+            // Invoke key-specific listeners
+            if (m_ChangeListeners.TryGetValue(key, out var callback) && callback != null)
             {
                 foreach (Action handler in callback.GetInvocationList())
                 {

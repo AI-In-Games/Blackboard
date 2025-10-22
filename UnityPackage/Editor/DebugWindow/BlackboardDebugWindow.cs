@@ -176,7 +176,7 @@ namespace AiInGames.Blackboard.Editor
             typeLabel.AddToClassList("type-label");
             contentContainer.Add(typeLabel);
 
-            var valueField = BlackboardValueRenderer.CreateValueField(
+            var valueField = BlackboardEditorHelper.CreateValueField(
                 entry.Type,
                 entry.Value,
                 readOnly: false,

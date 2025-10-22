@@ -329,7 +329,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
         {
             var blackboard = target as BlackboardAsset;
 
-            return BlackboardValueRenderer.CreateValueField(
+            return BlackboardEditorHelper.CreateValueField(
                 valueType,
                 value,
                 readOnly: readOnly,
@@ -450,19 +450,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
 
         internal static object GetDefaultValue(Type type)
         {
-            if (type == typeof(int)) return 0;
-            if (type == typeof(float)) return 0f;
-            if (type == typeof(bool)) return false;
-            if (type == typeof(string)) return string.Empty;
-            if (type == typeof(Vector3)) return Vector3.zero;
-            if (type == typeof(List<int>)) return new List<int>();
-            if (type == typeof(List<float>)) return new List<float>();
-            if (type == typeof(List<bool>)) return new List<bool>();
-            if (type == typeof(List<string>)) return new List<string>();
-            if (type == typeof(List<Vector3>)) return new List<Vector3>();
-            if (type == typeof(List<GameObject>)) return new List<GameObject>();
-            if (type == typeof(List<Transform>)) return new List<Transform>();
-            return null;
+            return type.IsValueType ? System.Activator.CreateInstance(type) : null;
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace AiInGames.Blackboard.Editor
 {
@@ -315,6 +316,19 @@ namespace AiInGames.Blackboard.Editor
 
             serializedObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(blackboardAsset);
+        }
+
+        public static VisualElement CreateValueField(Type valueType, object value, bool readOnly = false, Action<object> onValueChanged = null)
+        {
+            var entry = BlackboardValuesFactory.CreateEntry(valueType);
+            if (entry == null)
+                return new Label($"Unsupported type: {valueType?.Name ?? "null"}");
+
+            if (value != null || (valueType.IsValueType && value == null))
+                entry.SetValue(value ?? Activator.CreateInstance(valueType));
+
+            return entry.CreateInspectorElement(readOnly, onValueChanged)
+                   ?? new Label($"No inspector for: {valueType.Name}");
         }
     }
 }

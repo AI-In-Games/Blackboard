@@ -82,17 +82,16 @@ namespace AiInGames.Blackboard.Editor
 
             m_StatusLabel.ClearClassList();
             m_StatusLabel.AddToClassList("debug-window-status");
-            m_StatusLabel.text = m_ViewModel.GetStatusMessage();
 
-            var statusType = m_ViewModel.GetStatusType();
-            switch (statusType)
+            if (m_ViewModel.TargetBlackboard != null)
             {
-                case StatusType.Active:
-                    m_StatusLabel.AddToClassList("debug-window-status-active");
-                    break;
-                case StatusType.Inactive:
-                    m_StatusLabel.AddToClassList("debug-window-status-inactive");
-                    break;
+                m_StatusLabel.text = "Blackboard selected";
+                m_StatusLabel.AddToClassList("debug-window-status-active");
+            }
+            else
+            {
+                m_StatusLabel.text = "No blackboard selected";
+                m_StatusLabel.AddToClassList("debug-window-status-inactive");
             }
         }
 

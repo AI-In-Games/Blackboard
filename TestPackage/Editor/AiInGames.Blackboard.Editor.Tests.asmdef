@@ -4,6 +4,7 @@
   "references": [
     "AiInGames.Blackboard",
     "AiInGames.Blackboard.Editor",
+    "AiInGames.Blackboard.Tests",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

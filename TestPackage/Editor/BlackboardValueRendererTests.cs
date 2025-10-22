@@ -54,21 +54,5 @@ namespace AiInGames.Blackboard.Tests.Editor
             Assert.IsNotNull(element);
             Assert.IsTrue(element.enabledSelf, "Editable field should be enabled");
         }
-
-        [Test]
-        public void CreateRuntimeEntryElement_DoesNotThrow()
-        {
-            Assert.DoesNotThrow(() =>
-                BlackboardValueRenderer.CreateRuntimeEntryElement("TestKey", 12345, typeof(int), 42));
-        }
-
-        [Test]
-        public void CreateRuntimeEntryElement_ReturnsVisualElement()
-        {
-            var element = BlackboardValueRenderer.CreateRuntimeEntryElement("TestKey", 12345, typeof(int), 42);
-
-            Assert.IsNotNull(element);
-            Assert.IsInstanceOf<VisualElement>(element);
-        }
     }
 }

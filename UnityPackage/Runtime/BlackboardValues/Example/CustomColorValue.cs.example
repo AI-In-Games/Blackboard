@@ -1,0 +1,55 @@
+using System;
+using UnityEngine;
+#if UNITY_EDITOR
+using UnityEngine.UIElements;
+using UnityEditor.UIElements;
+#endif
+
+namespace AiInGames.Blackboard
+{
+    [Serializable]
+    public class CustomColorValue : BlackboardValue<Color>
+    {
+        public override string GetDisplayName() => "Custom Color";
+
+#if UNITY_EDITOR
+        public override VisualElement CreateInspectorElement(bool readOnly, Action<object> onValueChanged)
+        {
+            var container = new VisualElement();
+            container.style.flexDirection = FlexDirection.Row;
+            container.style.alignItems = Align.Center;
+
+            var colorField = new ColorField
+            {
+                value = m_Value,
+                showAlpha = true
+            };
+            colorField.SetEnabled(!readOnly);
+            colorField.style.flexGrow = 1;
+
+            if (!readOnly && onValueChanged != null)
+            {
+                colorField.RegisterValueChangedCallback(evt =>
+                {
+                    m_Value = evt.newValue;
+                    onValueChanged(evt.newValue);
+                });
+            }
+
+            var hexLabel = new Label(ColorUtility.ToHtmlStringRGBA(m_Value));
+            hexLabel.style.marginLeft = 8;
+            hexLabel.style.minWidth = 80;
+
+            colorField.RegisterValueChangedCallback(evt =>
+            {
+                hexLabel.text = ColorUtility.ToHtmlStringRGBA(evt.newValue);
+            });
+
+            container.Add(colorField);
+            container.Add(hexLabel);
+
+            return container;
+        }
+#endif
+    }
+}

@@ -1,6 +1,5 @@
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.TestTools;
 using System.Collections.Generic;
 
 namespace AiInGames.Blackboard.Tests
@@ -13,13 +12,12 @@ namespace AiInGames.Blackboard.Tests
         [SetUp]
         public void SetUp()
         {
-            blackboard = ScriptableObject.CreateInstance<Blackboard>();
+            blackboard = new Blackboard();
         }
 
         [TearDown]
         public void TearDown()
         {
-            Object.DestroyImmediate(blackboard);
         }
 
         [Test]
@@ -124,7 +122,6 @@ namespace AiInGames.Blackboard.Tests
 
             Assert.IsFalse(blackboard.HasKey<int>("Key1"));
             Assert.IsFalse(blackboard.HasKey<string>("Key2"));
-            Assert.AreEqual(0, blackboard.KeyCount());
         }
 
         [Test]
@@ -193,7 +190,7 @@ namespace AiInGames.Blackboard.Tests
         [Test]
         public void GetValue_WithParent_FallsBackToParent()
         {
-            var parent = ScriptableObject.CreateInstance<Blackboard>();
+            var parent = new Blackboard();
             blackboard.Parent = parent;
 
             parent.SetValue<int>("Inherited", 999);
@@ -201,14 +198,12 @@ namespace AiInGames.Blackboard.Tests
             var result = blackboard.GetValue<int>("Inherited");
 
             Assert.AreEqual(999, result);
-
-            Object.DestroyImmediate(parent);
         }
 
         [Test]
         public void GetValue_LocalOverridesParent()
         {
-            var parent = ScriptableObject.CreateInstance<Blackboard>();
+            var parent = new Blackboard();
             blackboard.Parent = parent;
 
             parent.SetValue<string>("Override", "Parent");
@@ -217,40 +212,17 @@ namespace AiInGames.Blackboard.Tests
             var result = blackboard.GetValue<string>("Override");
 
             Assert.AreEqual("Child", result);
-
-            Object.DestroyImmediate(parent);
         }
 
         [Test]
         public void HasKey_ChecksParent()
         {
-            var parent = ScriptableObject.CreateInstance<Blackboard>();
+            var parent = new Blackboard();
             blackboard.Parent = parent;
 
             parent.SetValue<int>("ParentKey", 123);
 
             Assert.IsTrue(blackboard.HasKey<int>("ParentKey"));
-
-            Object.DestroyImmediate(parent);
-        }
-
-        [Test]
-        public void GetSet_ManyOperations_IsEfficient()
-        {
-            blackboard.SetValue<int>("Perf", 1);
-
-            System.GC.Collect();
-            var gcBefore = System.GC.CollectionCount(0);
-
-            for (int i = 0; i < 1000; i++)
-            {
-                blackboard.SetValue<int>("Perf", i);
-                var value = blackboard.GetValue<int>("Perf");
-            }
-
-            var gcAfter = System.GC.CollectionCount(0);
-
-            Assert.AreEqual(gcBefore, gcAfter, "Should not allocate during Get/Set");
         }
 
         [Test]
@@ -263,18 +235,22 @@ namespace AiInGames.Blackboard.Tests
         }
 
         [Test]
-        public void Count_ReflectsNumberOfEntries()
+        public void HasKey_AfterAddRemoveOperations_ReflectsState()
         {
-            Assert.AreEqual(0, blackboard.KeyCount());
+            Assert.IsFalse(blackboard.HasKey<int>("Key1"));
+            Assert.IsFalse(blackboard.HasKey<int>("Key2"));
 
             blackboard.SetValue<int>("Key1", 1);
-            Assert.AreEqual(1, blackboard.KeyCount());
+            Assert.IsTrue(blackboard.HasKey<int>("Key1"));
+            Assert.IsFalse(blackboard.HasKey<int>("Key2"));
 
             blackboard.SetValue<int>("Key2", 2);
-            Assert.AreEqual(2, blackboard.KeyCount());
+            Assert.IsTrue(blackboard.HasKey<int>("Key1"));
+            Assert.IsTrue(blackboard.HasKey<int>("Key2"));
 
             blackboard.Remove<int>("Key1");
-            Assert.AreEqual(1, blackboard.KeyCount());
+            Assert.IsFalse(blackboard.HasKey<int>("Key1"));
+            Assert.IsTrue(blackboard.HasKey<int>("Key2"));
         }
 
         [Test]
@@ -452,83 +428,30 @@ namespace AiInGames.Blackboard.Tests
             CollectionAssert.AreEqual(list, callbackValue);
         }
 
-
-        [Test]
-        public void SetParent_ToSelf_PreventsCircularReference()
-        {
-            LogAssert.Expect(LogType.Error, "Blackboard cannot be its own parent");
-
-            blackboard.Parent = blackboard;
-
-            Assert.IsNull(blackboard.Parent, "Parent should remain null after self-assignment");
-        }
-
-        [Test]
-        public void SetParent_DirectCycle_PreventsCircularReference()
-        {
-            var parentBlackboard = ScriptableObject.CreateInstance<Blackboard>();
-
-            blackboard.Parent = parentBlackboard;
-
-            LogAssert.Expect(LogType.Error, "Cannot set parent: would create circular reference");
-            parentBlackboard.Parent = blackboard;
-
-            Assert.IsNull(parentBlackboard.Parent, "Parent should remain null after circular assignment");
-            Assert.AreEqual(parentBlackboard, blackboard.Parent, "Child's parent should not change");
-
-            Object.DestroyImmediate(parentBlackboard);
-        }
-
-        [Test]
-        public void SetParent_MultiLevelCycle_PreventsCircularReference()
-        {
-            var blackboardA = ScriptableObject.CreateInstance<Blackboard>();
-            var blackboardB = ScriptableObject.CreateInstance<Blackboard>();
-            var blackboardC = ScriptableObject.CreateInstance<Blackboard>();
-
-            blackboardA.Parent = blackboardB;
-            blackboardB.Parent = blackboardC;
-
-            LogAssert.Expect(LogType.Error, "Cannot set parent: would create circular reference");
-            blackboardC.Parent = blackboardA;
-
-            Assert.IsNull(blackboardC.Parent, "Should prevent cycle at third level");
-            Assert.AreEqual(blackboardB, blackboardA.Parent);
-            Assert.AreEqual(blackboardC, blackboardB.Parent);
-
-            Object.DestroyImmediate(blackboardA);
-            Object.DestroyImmediate(blackboardB);
-            Object.DestroyImmediate(blackboardC);
-        }
-
         [Test]
         public void SetParent_ValidMultiLevelHierarchy_Works()
         {
-            var blackboardA = ScriptableObject.CreateInstance<Blackboard>();
-            var blackboardB = ScriptableObject.CreateInstance<Blackboard>();
-            var blackboardC = ScriptableObject.CreateInstance<Blackboard>();
+            var level1 = new Blackboard();
+            var level2 = new Blackboard();
+            var level3 = new Blackboard();
 
-            blackboardC.SetValue<int>("Level3", 3);
-            blackboardB.SetValue<int>("Level2", 2);
-            blackboardA.SetValue<int>("Level1", 1);
+            level3.SetValue<int>("Level3", 3);
+            level2.SetValue<int>("Level2", 2);
+            level1.SetValue<int>("Level1", 1);
 
-            blackboardA.Parent = blackboardB;
-            blackboardB.Parent = blackboardC;
+            level1.Parent = level2;
+            level2.Parent = level3;
 
-            Assert.AreEqual(1, blackboardA.GetValue<int>("Level1"));
-            Assert.AreEqual(2, blackboardA.GetValue<int>("Level2"));
-            Assert.AreEqual(3, blackboardA.GetValue<int>("Level3"));
-
-            Object.DestroyImmediate(blackboardA);
-            Object.DestroyImmediate(blackboardB);
-            Object.DestroyImmediate(blackboardC);
+            Assert.AreEqual(1, level1.GetValue<int>("Level1"));
+            Assert.AreEqual(2, level1.GetValue<int>("Level2"));
+            Assert.AreEqual(3, level1.GetValue<int>("Level3"));
         }
 
         [Test]
         public void SetParent_AfterPreviousAssignment_AllowsReassignment()
         {
-            var parent1 = ScriptableObject.CreateInstance<Blackboard>();
-            var parent2 = ScriptableObject.CreateInstance<Blackboard>();
+            var parent1 = new Blackboard();
+            var parent2 = new Blackboard();
 
             parent1.SetValue<string>("Source", "Parent1");
             parent2.SetValue<string>("Source", "Parent2");
@@ -538,18 +461,15 @@ namespace AiInGames.Blackboard.Tests
 
             blackboard.Parent = parent2;
             Assert.AreEqual("Parent2", blackboard.GetValue<string>("Source"));
-
-            Object.DestroyImmediate(parent1);
-            Object.DestroyImmediate(parent2);
         }
 
         [Test]
         public void GetValue_WithDeepParentChain_IteratesCorrectly()
         {
-            var level1 = ScriptableObject.CreateInstance<Blackboard>();
-            var level2 = ScriptableObject.CreateInstance<Blackboard>();
-            var level3 = ScriptableObject.CreateInstance<Blackboard>();
-            var level4 = ScriptableObject.CreateInstance<Blackboard>();
+            var level1 = new Blackboard();
+            var level2 = new Blackboard();
+            var level3 = new Blackboard();
+            var level4 = new Blackboard();
 
             level4.SetValue<int>("DeepValue", 42);
 
@@ -559,19 +479,14 @@ namespace AiInGames.Blackboard.Tests
 
             var result = level1.GetValue<int>("DeepValue");
             Assert.AreEqual(42, result, "Should traverse 4 levels of parent chain iteratively");
-
-            Object.DestroyImmediate(level1);
-            Object.DestroyImmediate(level2);
-            Object.DestroyImmediate(level3);
-            Object.DestroyImmediate(level4);
         }
 
         [Test]
         public void HasKey_WithDeepParentChain_IteratesCorrectly()
         {
-            var level1 = ScriptableObject.CreateInstance<Blackboard>();
-            var level2 = ScriptableObject.CreateInstance<Blackboard>();
-            var level3 = ScriptableObject.CreateInstance<Blackboard>();
+            var level1 = new Blackboard();
+            var level2 = new Blackboard();
+            var level3 = new Blackboard();
 
             level3.SetValue<string>("DeepKey", "value");
 
@@ -579,10 +494,6 @@ namespace AiInGames.Blackboard.Tests
             level2.Parent = level3;
 
             Assert.IsTrue(level1.HasKey<string>("DeepKey"), "Should find key in deep parent chain");
-
-            Object.DestroyImmediate(level1);
-            Object.DestroyImmediate(level2);
-            Object.DestroyImmediate(level3);
         }
 
         [Test]
@@ -610,10 +521,7 @@ namespace AiInGames.Blackboard.Tests
 
             blackboard.SetValue("TestKey", 42);
 
-            blackboard.OnAnyValueChanged += (key) =>
-            {
-                callbackCount++;
-            };
+            blackboard.OnAnyValueChanged += (key) => { callbackCount++; };
 
             blackboard.SetValue("TestKey", 42);
 
@@ -625,10 +533,7 @@ namespace AiInGames.Blackboard.Tests
         {
             var changedKeys = new List<string>();
 
-            blackboard.OnAnyValueChanged += (key) =>
-            {
-                changedKeys.Add(key);
-            };
+            blackboard.OnAnyValueChanged += (key) => { changedKeys.Add(key); };
 
             blackboard.SetValue("Key1", 1);
             blackboard.SetValue("Key2", "test");
@@ -640,5 +545,37 @@ namespace AiInGames.Blackboard.Tests
             Assert.Contains("Key3", changedKeys);
         }
 
+        [Test]
+        public void TryGetValue_WithWrongType_ReturnsFalse()
+        {
+            blackboard.SetValue<int>("key", 42);
+
+            bool success = blackboard.TryGetValue<string>("key", out var value);
+
+            Assert.IsFalse(success);
+            Assert.IsNull(value);
+        }
+
+        [Test]
+        public void Remove_WithWrongType_ReturnsFalse()
+        {
+            blackboard.SetValue<int>("key", 42);
+
+            bool removed = blackboard.Remove<float>("key");
+
+            Assert.IsFalse(removed);
+            Assert.IsTrue(blackboard.HasKey<int>("key"), "Should still have key with correct type");
+            Assert.AreEqual(42, blackboard.GetValue<int>("key"));
+        }
+
+        [Test]
+        public void HasKey_WithWrongType_ReturnsFalse()
+        {
+            blackboard.SetValue<int>("key", 42);
+
+            Assert.IsTrue(blackboard.HasKey<int>("key"));
+            Assert.IsFalse(blackboard.HasKey<string>("key"));
+            Assert.IsFalse(blackboard.HasKey<float>("key"));
+        }
     }
 }

@@ -9,22 +9,18 @@ namespace AiInGames.Blackboard.Tests.Editor
     public class BlackboardWindowViewModelTests
     {
         BlackboardWindowViewModel m_ViewModel;
-        Blackboard m_Blackboard;
+        IBlackboard m_Blackboard;
 
         [SetUp]
         public void SetUp()
         {
             m_ViewModel = new BlackboardWindowViewModel();
-            m_Blackboard = ScriptableObject.CreateInstance<Blackboard>();
+            m_Blackboard = new Blackboard();
         }
 
         [TearDown]
         public void TearDown()
         {
-            if (m_Blackboard != null)
-            {
-                Object.DestroyImmediate(m_Blackboard);
-            }
         }
 
         [Test]
@@ -57,8 +53,8 @@ namespace AiInGames.Blackboard.Tests.Editor
         [Test]
         public void GetEntries_ReturnsCorrectEntries()
         {
-            BlackboardEditorHelper.SetValue(m_Blackboard, "TestInt", typeof(int), 42);
-            BlackboardEditorHelper.SetValue(m_Blackboard, "TestString", typeof(string), "hello");
+            m_Blackboard.SetValue<int>("TestInt", 42);
+            m_Blackboard.SetValue<string>("TestString", "hello");
             m_ViewModel.SetTarget(m_Blackboard);
 
             var entries = m_ViewModel.GetEntries();
@@ -70,7 +66,7 @@ namespace AiInGames.Blackboard.Tests.Editor
         [Test]
         public void SetValue_UpdatesBlackboardValue()
         {
-            BlackboardEditorHelper.SetValue(m_Blackboard, "Counter", typeof(int), 0);
+            m_Blackboard.SetValue<int>("Counter", 0);
             m_ViewModel.SetTarget(m_Blackboard);
 
             m_ViewModel.SetValue("Counter", typeof(int), 99);
@@ -81,7 +77,7 @@ namespace AiInGames.Blackboard.Tests.Editor
         [Test]
         public void SetValue_FiresOnDataChanged()
         {
-            BlackboardEditorHelper.SetValue(m_Blackboard, "Counter", typeof(int), 0);
+            m_Blackboard.SetValue<int>("Counter", 0);
             m_ViewModel.SetTarget(m_Blackboard);
 
             bool eventFired = false;
@@ -98,8 +94,8 @@ namespace AiInGames.Blackboard.Tests.Editor
         [TestCase(typeof(string), "test")]
         public void SetValue_SupportsBasicTypes(System.Type type, object value)
         {
+            ((Blackboard)m_Blackboard).SetValue("TestKey", type, GetDefaultValue(type));
             m_ViewModel.SetTarget(m_Blackboard);
-            BlackboardEditorHelper.SetValue(m_Blackboard, "TestKey", type, GetDefaultValue(type));
 
             m_ViewModel.SetValue("TestKey", type, value);
 
@@ -112,8 +108,8 @@ namespace AiInGames.Blackboard.Tests.Editor
         public void SetValue_SupportsList()
         {
             var list = new List<int> { 1, 2, 3 };
+            m_Blackboard.SetValue<List<int>>("TestList", new List<int>());
             m_ViewModel.SetTarget(m_Blackboard);
-            BlackboardEditorHelper.SetValue(m_Blackboard, "TestList", typeof(List<int>), new List<int>());
 
             m_ViewModel.SetValue("TestList", typeof(List<int>), list);
 

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace AiInGames.Blackboard.Editor
 {
@@ -21,47 +20,54 @@ namespace AiInGames.Blackboard.Editor
             if (TargetBlackboard == null)
                 return Array.Empty<BlackboardEntryViewModel>();
 
-            var blackboard = TargetBlackboard as Blackboard;
-            if (blackboard == null)
-                return Array.Empty<BlackboardEntryViewModel>();
+            var entries = new List<BlackboardEntryViewModel>();
 
-            return BlackboardEditorHelper.GetAllEntries(blackboard, includeInherited: true)
-                .Select(e => new BlackboardEntryViewModel
+            if (TargetBlackboard is BlackboardAsset blackboardAsset)
+            {
+                foreach (var entry in BlackboardEditorHelper.GetAllEntries(blackboardAsset, includeInherited: false))
                 {
-                    Name = e.name,
-                    Type = e.type,
-                    Value = e.value
-                })
-                .ToList();
+                    entries.Add(new BlackboardEntryViewModel
+                    {
+                        Name = entry.name,
+                        Type = entry.type,
+                        Value = entry.value
+                    });
+                }
+            }
+            else if (TargetBlackboard is Blackboard runtimeBlackboard)
+            {
+                foreach (var entry in runtimeBlackboard.GetAllEntries())
+                {
+                    entries.Add(new BlackboardEntryViewModel
+                    {
+                        Name = entry.key,
+                        Type = entry.type,
+                        Value = entry.value
+                    });
+                }
+            }
+
+            return entries;
         }
 
         public void SetValue(string keyName, Type valueType, object newValue)
         {
             if (TargetBlackboard == null) return;
 
-            var blackboard = TargetBlackboard as Blackboard;
-            if (blackboard != null)
+            var blackboardAsset = TargetBlackboard as BlackboardAsset;
+            if (blackboardAsset != null)
             {
-                BlackboardEditorHelper.SetValue(blackboard, keyName, valueType, newValue);
+                using (new UndoScope(blackboardAsset, "Modify Blackboard Value"))
+                {
+                    BlackboardEditorHelper.SetValue(blackboardAsset, keyName, valueType, newValue);
+                }
+            }
+            else if (TargetBlackboard is Blackboard runtimeBlackboard)
+            {
+                runtimeBlackboard.SetValue(keyName, valueType, newValue);
             }
 
             NotifyDataChanged();
-        }
-
-        public string GetStatusMessage()
-        {
-            if (TargetBlackboard != null)
-                return "Blackboard selected";
-
-            return "No blackboard selected";
-        }
-
-        public StatusType GetStatusType()
-        {
-            if (TargetBlackboard != null)
-                return StatusType.Active;
-
-            return StatusType.Inactive;
         }
 
         void NotifyDataChanged()
@@ -75,11 +81,5 @@ namespace AiInGames.Blackboard.Editor
         public string Name { get; set; }
         public Type Type { get; set; }
         public object Value { get; set; }
-    }
-
-    internal enum StatusType
-    {
-        Active,
-        Inactive
     }
 }

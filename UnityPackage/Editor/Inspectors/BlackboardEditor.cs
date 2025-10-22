@@ -8,7 +8,7 @@ using UnityEngine.UIElements;
 
 namespace AiInGames.Blackboard.Editor.Inspectors
 {
-    [CustomEditor(typeof(Blackboard))]
+    [CustomEditor(typeof(BlackboardAsset))]
     internal class BlackboardEditor : UnityEditor.Editor
     {
         VisualElement m_Root;
@@ -28,7 +28,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
         {
             if (m_EntriesContainer != null)
             {
-                var blackboard = target as Blackboard;
+                var blackboard = target as BlackboardAsset;
                 ForceReinitializeBlackboard(blackboard);
                 RefreshEntries();
             }
@@ -43,10 +43,10 @@ namespace AiInGames.Blackboard.Editor.Inspectors
             {
                 evt.menu.AppendAction("Open in Blackboard Debug Window", action =>
                 {
-                    var blackboard = target as Blackboard;
+                    var blackboard = target as BlackboardAsset;
                     if (blackboard != null)
                     {
-                        BlackboardDebugWindow.ShowWindow(blackboard);
+                        BlackboardDebugWindow.ShowWindow(blackboard.Runtime);
                     }
                 });
             }));
@@ -82,14 +82,14 @@ namespace AiInGames.Blackboard.Editor.Inspectors
 
             var parentField = new ObjectField("Parent Blackboard")
             {
-                objectType = typeof(Blackboard),
+                objectType = typeof(BlackboardAsset),
                 value = serializedObject.FindProperty("m_ParentBlackboard").objectReferenceValue
             };
 
             parentField.RegisterValueChangedCallback(evt =>
             {
-                var blackboard = target as Blackboard;
-                var newParent = evt.newValue as Blackboard;
+                var blackboard = target as BlackboardAsset;
+                var newParent = evt.newValue as BlackboardAsset;
 
                 // Validate parent assignment to prevent circular references
                 if (newParent == blackboard)
@@ -110,6 +110,9 @@ namespace AiInGames.Blackboard.Editor.Inspectors
                 {
                     serializedObject.FindProperty("m_ParentBlackboard").objectReferenceValue = evt.newValue;
                     serializedObject.ApplyModifiedProperties();
+
+                    blackboard.SyncToRuntime(notifyChanges: false);
+                    EditorUtility.SetDirty(target);
                     RefreshEntries();
                 }
             });
@@ -162,13 +165,13 @@ namespace AiInGames.Blackboard.Editor.Inspectors
         {
             m_EntriesContainer.Clear();
 
-            var blackboard = target as Blackboard;
+            var blackboard = target as BlackboardAsset;
             var localEntries = BlackboardEditorHelper.GetAllEntries(blackboard, includeInherited: false).ToList();
             var inheritedEntries = new List<(string name, Type type, object value)>();
 
-            if (blackboard.Parent != null)
+            if (blackboard.m_ParentBlackboard != null)
             {
-                var allParentEntries = BlackboardEditorHelper.GetAllEntries(blackboard.Parent, includeInherited: true).ToList();
+                var allParentEntries = BlackboardEditorHelper.GetAllEntries(blackboard.m_ParentBlackboard, includeInherited: true).ToList();
                 var localKeys = new HashSet<string>(localEntries.Select(e => e.name));
 
                 inheritedEntries = allParentEntries.Where(e => !localKeys.Contains(e.name)).ToList();
@@ -197,7 +200,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
 
             if (inheritedEntries.Count > 0)
             {
-                var inheritedHeader = new Label($"Inherited Keys ({blackboard.Parent.name})");
+                var inheritedHeader = new Label($"Inherited Keys ({blackboard.m_ParentBlackboard.name})");
                 inheritedHeader.AddToClassList("section-header");
                 inheritedHeader.AddToClassList("inherited-section-header");
                 m_EntriesContainer.Add(inheritedHeader);
@@ -258,7 +261,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
                         return;
                     }
 
-                    var blackboard = target as Blackboard;
+                    var blackboard = target as BlackboardAsset;
                     var existingNames = BlackboardEditorHelper.GetAllEntries(blackboard, includeInherited: false).Select(e => e.name).ToList();
                     existingNames.Remove(oldName);
 
@@ -271,7 +274,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
                     }
 
                     // Check if key exists in parent hierarchy
-                    if (blackboard.Parent != null && BlackboardEditorHelper.IsKeyInParent(blackboard.Parent, newName))
+                    if (blackboard.m_ParentBlackboard != null && BlackboardEditorHelper.IsKeyInParent(blackboard.m_ParentBlackboard, newName))
                     {
                         Debug.LogError($"Cannot rename to '{newName}': key already exists in parent blackboard hierarchy");
                         keyField.SetValueWithoutNotify(oldName);
@@ -324,7 +327,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
 
         VisualElement CreateValueField(string keyName, Type valueType, object value, bool readOnly = false)
         {
-            var blackboard = target as Blackboard;
+            var blackboard = target as BlackboardAsset;
 
             return BlackboardValueRenderer.CreateValueField(
                 valueType,
@@ -341,7 +344,7 @@ namespace AiInGames.Blackboard.Editor.Inspectors
 
         void AddNewKey(Type valueType)
         {
-            var blackboard = target as Blackboard;
+            var blackboard = target as BlackboardAsset;
             // Include inherited keys to avoid name collisions with parent blackboard keys
             var existingNames = BlackboardEditorHelper.GetAllEntries(blackboard, includeInherited: true).Select(e => e.name).ToArray();
 
@@ -377,20 +380,19 @@ namespace AiInGames.Blackboard.Editor.Inspectors
             if (!EditorUtility.DisplayDialog("Delete Key", $"Delete key '{keyName}'?", "Delete", "Cancel"))
                 return;
 
-            var blackboard = target as Blackboard;
+            var blackboard = target as BlackboardAsset;
 
             using (new UndoScope(target, "Delete Blackboard Key"))
             {
-                var entriesProp = serializedObject.FindProperty("m_Entries");
-                for (int i = 0; i < entriesProp.arraySize; i++)
+                var valuesProp = serializedObject.FindProperty("m_Values");
+                for (int i = 0; i < valuesProp.arraySize; i++)
                 {
-                    var entryProp = entriesProp.GetArrayElementAtIndex(i);
-                    var keyProp = entryProp.FindPropertyRelative("m_Key");
-                    var nameProp = keyProp.FindPropertyRelative("m_Name");
+                    var valueProp = valuesProp.GetArrayElementAtIndex(i);
+                    var wrapper = valueProp.managedReferenceValue as BlackboardValue;
 
-                    if (nameProp.stringValue == keyName)
+                    if (wrapper != null && wrapper.Key == keyName)
                     {
-                        entriesProp.DeleteArrayElementAtIndex(i);
+                        valuesProp.DeleteArrayElementAtIndex(i);
                         serializedObject.ApplyModifiedProperties();
                         break;
                     }
@@ -402,41 +404,46 @@ namespace AiInGames.Blackboard.Editor.Inspectors
             RefreshEntries();
         }
 
-        void ForceReinitializeBlackboard(Blackboard blackboard)
+        void ForceReinitializeBlackboard(BlackboardAsset blackboard)
         {
             BlackboardEditorHelper.ForceReinitialize(blackboard);
         }
 
         void RenameKey(string oldName, string newName, Type valueType)
         {
-            var blackboard = target as Blackboard;
-            var existingValue = BlackboardEditorHelper.GetAllEntries(blackboard).FirstOrDefault(e => e.name == oldName).value;
+            var blackboard = target as BlackboardAsset;
 
-            var entriesProp = serializedObject.FindProperty("m_Entries");
-            for (int i = 0; i < entriesProp.arraySize; i++)
+            var valuesProp = serializedObject.FindProperty("m_Values");
+            for (int i = 0; i < valuesProp.arraySize; i++)
             {
-                var entryProp = entriesProp.GetArrayElementAtIndex(i);
-                var keyProp = entryProp.FindPropertyRelative("m_Key");
-                var nameProp = keyProp.FindPropertyRelative("m_Name");
+                var valueProp = valuesProp.GetArrayElementAtIndex(i);
+                var wrapper = valueProp.managedReferenceValue as BlackboardValue;
 
-                if (nameProp.stringValue == oldName)
+                if (wrapper != null && wrapper.Key == oldName)
                 {
-                    nameProp.stringValue = newName;
+                    var existingValue = wrapper.GetValue();
+                    var newWrapper = BlackboardValuesFactory.CreateEntry(newName, valueType);
+                    newWrapper.SetValue(existingValue);
+                    valueProp.managedReferenceValue = newWrapper;
+
                     serializedObject.ApplyModifiedProperties();
-                    BlackboardEditorHelper.SetValue(blackboard, newName, valueType, existingValue);
+
+                    blackboard.SyncAndNotifyKey(newName);
+
+                    EditorUtility.SetDirty(blackboard);
                     break;
                 }
             }
         }
 
-        bool WouldCreateCycle(Blackboard child, Blackboard potentialParent)
+        bool WouldCreateCycle(BlackboardAsset child, BlackboardAsset potentialParent)
         {
             var current = potentialParent;
             while (current != null)
             {
                 if (current == child)
                     return true;
-                current = current.Parent;
+                current = current.m_ParentBlackboard;
             }
             return false;
         }

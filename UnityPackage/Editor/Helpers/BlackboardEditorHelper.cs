@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,58 +12,59 @@ namespace AiInGames.Blackboard.Editor
     /// </summary>
     internal static class BlackboardEditorHelper
     {
-        public static readonly (string displayName, Type type)[] SupportedTypes = new[]
+        static class FieldNames
         {
-            ("Int", typeof(int)),
-            ("Float", typeof(float)),
-            ("Bool", typeof(bool)),
-            ("String", typeof(string)),
-            ("Vector3", typeof(Vector3)),
-            ("GameObject", typeof(GameObject)),
-            ("Transform", typeof(Transform)),
-            ("List<Int>", typeof(System.Collections.Generic.List<int>)),
-            ("List<Float>", typeof(System.Collections.Generic.List<float>)),
-            ("List<Bool>", typeof(System.Collections.Generic.List<bool>)),
-            ("List<String>", typeof(System.Collections.Generic.List<string>)),
-            ("List<Vector3>", typeof(System.Collections.Generic.List<Vector3>)),
-            ("List<GameObject>", typeof(System.Collections.Generic.List<GameObject>)),
-            ("List<Transform>", typeof(System.Collections.Generic.List<Transform>))
-        };
+            static readonly BlackboardAsset s_Blackboard = default;
+            public static readonly string Values = nameof(s_Blackboard.m_Values);
+        }
 
-        const string k_EntriesKey = "m_Entries";
-        const string k_KeyKey = "m_Key";
-        const string k_NameKey = "m_Name";
-        const string k_ParentBlackboard = "m_ParentBlackboard";
-        const string k_ValuesKey = "m_Values";
-        const string k_TypesKey = "m_Types";
+        /// <summary>
+        /// Gets all supported types by querying the BlackboardCustomValueFactory.
+        /// This automatically includes any custom types that users have added.
+        /// </summary>
+        public static IEnumerable<(string displayName, Type type)> SupportedTypes
+        {
+            get
+            {
+                var types = BlackboardValuesFactory.GetAllSupportedTypes();
+                foreach (var type in types.OrderBy(t => GetSortOrder(t)).ThenBy(t => GetDisplayName(t)))
+                {
+                    yield return (GetDisplayName(type), type);
+                }
+            }
+        }
+
+        static int GetSortOrder(Type type)
+        {
+            // Primitives first, then Unity types, then lists, then custom types
+            if (type == typeof(int) || type == typeof(float) || type == typeof(bool) || type == typeof(string))
+                return 0;
+            if (type == typeof(Vector3) || type == typeof(GameObject) || type == typeof(Transform))
+                return 1;
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+                return 2;
+            return 3;
+        }
 
         public static string GetDisplayName(Type type)
         {
-            if (type == null) return "Unknown";
-
-            foreach (var (displayName, t) in SupportedTypes)
-            {
-                if (t == type)
-                    return displayName;
-            }
-
-            return type.Name;
+            return BlackboardValuesFactory.GetDisplayName(type);
         }
 
-        public static void SetValue(Blackboard blackboard, string keyName, Type valueType, object value, bool checkParentConflict = false)
+        public static void SetValue(BlackboardAsset blackboard, string keyName, Type valueType, object value, bool checkParentConflict = false, bool rebuildDictionaries = true)
         {
             // Check if key exists in parent blackboard
-            if (checkParentConflict && blackboard.Parent != null)
+            if (checkParentConflict && blackboard.m_ParentBlackboard != null)
             {
-                if (IsKeyInParent(blackboard.Parent, keyName))
+                if (IsKeyInParent(blackboard.m_ParentBlackboard, keyName))
                 {
-                    UnityEngine.Debug.LogError($"Cannot create key '{keyName}': key already exists in parent blackboard hierarchy");
+                    Debug.LogError($"Cannot create key '{keyName}': key already exists in parent blackboard hierarchy");
                     return;
                 }
             }
 
             // Convert arrays to lists for serialization (Unity can serialize List<T> but not T[])
-            if (valueType.IsArray && value != null && value is System.Array array)
+            if (valueType.IsArray && value is System.Array array)
             {
                 var elementType = valueType.GetElementType();
                 var listType = typeof(List<>).MakeGenericType(elementType);
@@ -74,159 +76,174 @@ namespace AiInGames.Blackboard.Editor
                 }
 
                 value = list;
+                valueType = listType;
             }
 
-            // Get m_Entries list via reflection
-            var entriesField = blackboard.GetType().GetField(k_EntriesKey,
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var entriesList = entriesField.GetValue(blackboard) as System.Collections.Generic.List<BlackboardEntry>;
+            var serializedObject = new SerializedObject(blackboard);
+            serializedObject.Update();
 
-            if (entriesList == null)
+            var valuesProp = serializedObject.FindProperty(FieldNames.Values);
+            if (valuesProp == null)
             {
-                entriesList = new System.Collections.Generic.List<BlackboardEntry>();
-                entriesField.SetValue(blackboard, entriesList);
+                Debug.LogError("Failed to find m_Values property");
+                return;
             }
 
-            // Find or create entry
-            BlackboardEntry existingEntry = null;
+            // Check if value changed by reading directly from m_Values (inline to avoid duplicate SerializedObject)
             object oldValue = null;
             bool hadValue = false;
-
-            foreach (var entry in entriesList)
+            for (int i = 0; i < valuesProp.arraySize; i++)
             {
-                if (entry.key.Name == keyName)
+                var currentProp = valuesProp.GetArrayElementAtIndex(i);
+                var wrapper = currentProp.managedReferenceValue as BlackboardValue;
+
+                if (wrapper != null && wrapper.Key == keyName)
                 {
-                    existingEntry = entry;
-                    oldValue = entry.GetValue();
+                    oldValue = wrapper.GetValue();
                     hadValue = true;
                     break;
                 }
             }
 
-            // Check if value actually changed
-            bool valueChanged = !hadValue || !AreValuesEqual(oldValue, value, valueType);
+            bool valueChanged = !hadValue || !Equals(oldValue, value);
 
-            if (existingEntry != null)
+            // If value hasn't changed, skip all modification operations
+            if (!valueChanged && hadValue)
             {
-                // Update existing entry
-                existingEntry.SetValue(value);
-            }
-            else
-            {
-                // Create new entry
-                var keyData = new BlackboardKeyData(keyName, valueType);
-                var newEntry = new BlackboardEntry(keyData, value);
-                entriesList.Add(newEntry);
+                return;
             }
 
-            // Rebuild runtime dictionaries and fire change notifications only if value changed
-            blackboard.RebuildDictionaries(notifyChanges: valueChanged);
+            var valueProp = FindOrCreateValueProperty(valuesProp, keyName, valueType);
+            SetValueProperty(valueProp, value);
+
+            serializedObject.ApplyModifiedProperties();
+
+            // Directly update the runtime dictionary for this specific key
+            if (rebuildDictionaries)
+            {
+                blackboard.SyncAndNotifyKey(keyName);
+            }
 
             EditorUtility.SetDirty(blackboard);
         }
 
-        public static IEnumerable<(string name, Type type, object value)> GetAllEntries(Blackboard blackboard, bool includeInherited = false)
+        static SerializedProperty FindOrCreateValueProperty(SerializedProperty valuesProp, string keyName, Type valueType)
         {
-            var visited = new System.Collections.Generic.HashSet<Blackboard>();
+            // Look for existing wrapper with this key
+            int existingIndex = -1;
+            for (int i = 0; i < valuesProp.arraySize; i++)
+            {
+                var valueProp = valuesProp.GetArrayElementAtIndex(i);
+                var wrapper = valueProp.managedReferenceValue as BlackboardValue;
+
+                if (wrapper != null && wrapper.Key == keyName)
+                {
+                    existingIndex = i;
+                    break;
+                }
+            }
+
+            // If found, return the existing one
+            if (existingIndex >= 0)
+            {
+                return valuesProp.GetArrayElementAtIndex(existingIndex);
+            }
+
+            var newEntry = BlackboardValuesFactory.CreateEntry(keyName, valueType);
+            if (newEntry == null)
+            {
+                Debug.LogError($"Failed to create entry for type {valueType}. Make sure a BlackboardCustomValue subclass exists for this type.");
+                return null;
+            }
+
+            int newIndex = valuesProp.arraySize;
+            valuesProp.arraySize++;
+            var newValueProp = valuesProp.GetArrayElementAtIndex(newIndex);
+
+            newValueProp.managedReferenceValue = newEntry;
+
+            return newValueProp;
+        }
+
+        static void SetValueProperty(SerializedProperty valueProp, object value)
+        {
+            if (valueProp == null)
+                return;
+
+            var entry = valueProp.managedReferenceValue as BlackboardValue;
+            if (entry == null)
+                return;
+
+            var valueType = value?.GetType() ?? entry.GetValueType();
+
+            // Always create a new entry - uniform behavior for all types
+            // This is simpler and cleaner than branching between primitives and complex types
+            var newEntry = BlackboardValuesFactory.CreateEntry(entry.Key, valueType);
+            newEntry.SetValue(value);
+            valueProp.managedReferenceValue = newEntry;
+        }
+
+        static bool TryGetCurrentValue(BlackboardAsset blackboardAsset, string keyName, out object value)
+        {
+            var serializedObject = new SerializedObject(blackboardAsset);
+            serializedObject.Update();
+
+            var valuesProp = serializedObject.FindProperty(FieldNames.Values);
+            if (valuesProp != null)
+            {
+                for (int i = 0; i < valuesProp.arraySize; i++)
+                {
+                    var valueProp = valuesProp.GetArrayElementAtIndex(i);
+                    var wrapper = valueProp.managedReferenceValue as BlackboardValue;
+
+                    if (wrapper != null && wrapper.Key == keyName)
+                    {
+                        value = wrapper.GetValue();
+                        return true;
+                    }
+                }
+            }
+
+            value = null;
+            return false;
+        }
+
+        public static IEnumerable<(string name, Type type, object value)> GetAllEntries(BlackboardAsset blackboard, bool includeInherited = false)
+        {
+            var visited = new HashSet<BlackboardAsset>();
             return GetAllEntriesInternal(blackboard, includeInherited, visited);
         }
 
-        static IEnumerable<(string name, Type type, object value)> GetAllEntriesInternal(Blackboard blackboard, bool includeInherited, System.Collections.Generic.HashSet<Blackboard> visited)
+        static IEnumerable<(string name, Type type, object value)> GetAllEntriesInternal(BlackboardAsset blackboard, bool includeInherited, HashSet<BlackboardAsset> visited)
         {
             if (blackboard == null || !visited.Add(blackboard))
                 yield break;
 
-            var blackboardType = blackboard.GetType();
+            var yieldedKeys = new HashSet<string>();
+            var serializedObject = new SerializedObject(blackboard);
+            serializedObject.Update();
 
-            // Get the entries list to know what keys exist in the asset
-            var entriesListField = blackboardType.GetField(k_EntriesKey,
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var entriesList = entriesListField?.GetValue(blackboard) as System.Collections.Generic.List<BlackboardEntry>;
-
-            // Get runtime dictionaries
-            var valuesField = blackboardType.GetField(k_ValuesKey,
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var valuesDictionary = valuesField?.GetValue(blackboard) as System.Collections.Generic.Dictionary<string, object>;
-
-            var typesField = blackboardType.GetField(k_TypesKey,
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var typesDictionary = typesField?.GetValue(blackboard) as System.Collections.Generic.Dictionary<string, Type>;
-
-            // Track which keys we've already yielded
-            var yieldedKeys = new System.Collections.Generic.HashSet<string>();
-
-            // First, yield entries from the asset (these have proper names)
-            if (entriesList != null)
+            var valuesProp = serializedObject.FindProperty(FieldNames.Values);
+            if (valuesProp != null && valuesProp.isArray)
             {
-                foreach (var entry in entriesList)
+                for (int i = 0; i < valuesProp.arraySize; i++)
                 {
-                    if (entry == null || entry.key.ValueType == null)
-                        continue;
+                    var valueProp = valuesProp.GetArrayElementAtIndex(i);
+                    var wrapper = valueProp.managedReferenceValue as BlackboardValue;
 
-                    var name = entry.key.Name;
-                    var type = entry.key.ValueType;
-                    object value;
-
-                    // During play mode, use runtime dictionary if available
-                    if (valuesDictionary != null && valuesDictionary.ContainsKey(name))
+                    if (wrapper != null && !string.IsNullOrEmpty(wrapper.Key))
                     {
-                        value = valuesDictionary[name];
-                        // Update type from runtime dictionary if available
-                        if (typesDictionary != null && typesDictionary.ContainsKey(name))
-                        {
-                            type = typesDictionary[name];
-                        }
-                    }
-                    else
-                    {
-                        // Fall back to serialized value
-                        value = entry.GetValue();
-                    }
-
-                    // Convert List<T> back to T[] if the original type was an array
-                    if (type.IsArray && value != null && value is System.Collections.IList list)
-                    {
-                        var elementType = type.GetElementType();
-                        var array = System.Array.CreateInstance(elementType, list.Count);
-                        for (int i = 0; i < list.Count; i++)
-                        {
-                            array.SetValue(list[i], i);
-                        }
-                        value = array;
-                    }
-
-                    yieldedKeys.Add(name);
-                    yield return (name, type, value);
-                }
-            }
-
-            // Second, yield any runtime-only entries (not in asset, but set at runtime)
-            if (valuesDictionary != null && typesDictionary != null)
-            {
-                foreach (var kvp in valuesDictionary)
-                {
-                    var name = kvp.Key;
-
-                    // Skip if already yielded from asset entries
-                    if (yieldedKeys.Contains(name))
-                        continue;
-
-                    var value = kvp.Value;
-                    var type = typesDictionary.ContainsKey(name) ? typesDictionary[name] : value?.GetType();
-
-                    if (type != null)
-                    {
-                        yield return (name, type, value);
+                        yieldedKeys.Add(wrapper.Key);
+                        yield return (wrapper.Key, wrapper.GetValueType(), wrapper.GetValue());
                     }
                 }
             }
 
-            // Finally, yield inherited entries from parent if requested
-            if (includeInherited && blackboard.Parent != null)
+            // Yield inherited entries from parent if requested
+            if (includeInherited && blackboard.m_ParentBlackboard != null)
             {
-                foreach (var entry in GetAllEntriesInternal(blackboard.Parent, includeInherited: true, visited))
+                foreach (var entry in GetAllEntriesInternal(blackboard.m_ParentBlackboard, includeInherited: true, visited))
                 {
-                    // Only yield parent entries if not overridden locally
                     if (!yieldedKeys.Contains(entry.name))
                     {
                         yield return entry;
@@ -235,69 +252,69 @@ namespace AiInGames.Blackboard.Editor
             }
         }
 
-        public static void ForceReinitialize(Blackboard blackboard)
+        public static void ForceReinitialize(BlackboardAsset blackboard)
         {
-            // Rebuild runtime dictionaries from current serialized state
             EditorUtility.SetDirty(blackboard);
-            var serializedObject = new SerializedObject(blackboard);
-            serializedObject.Update();
-
-            blackboard.RebuildDictionaries(notifyChanges: false);
+            blackboard.SyncToRuntime(notifyChanges: false);
         }
 
-        public static bool IsKeyInParent(Blackboard parent, string keyName)
+        public static bool IsKeyInParent(BlackboardAsset parent, string keyName)
         {
             var current = parent;
             while (current != null)
             {
-                // Directly check m_Entries without recursion
-                var entriesField = current.GetType().GetField(k_EntriesKey,
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var entriesList = entriesField?.GetValue(current) as System.Collections.Generic.List<BlackboardEntry>;
+                // Check if key exists in this blackboard
+                if (TryGetCurrentValue(current, keyName, out _))
+                    return true;
 
-                if (entriesList != null)
-                {
-                    foreach (var entry in entriesList)
-                    {
-                        if (entry != null && entry.key.Name == keyName)
-                            return true;
-                    }
-                }
-
-                current = current.Parent;
+                current = current.m_ParentBlackboard;
             }
             return false;
         }
 
-        static bool AreValuesEqual(object oldValue, object newValue, Type valueType)
+        /// <summary>
+        /// Syncs runtime dictionary changes back to the serialized asset.
+        /// Useful when:
+        /// - Creating assets via AssetDatabase.CreateAsset with runtime modifications
+        /// - Test scenarios where runtime is modified directly
+        /// - Debug utilities that need to persist runtime state
+        /// In normal inspector usage, SetValue updates serialized data directly and is preferred.
+        /// </summary>
+        public static void SaveRuntimeDataToAsset(BlackboardAsset blackboardAsset)
         {
-            if (oldValue == null && newValue == null)
-                return true;
+            if (blackboardAsset == null || blackboardAsset.Runtime == null)
+                return;
 
-            if (oldValue == null || newValue == null)
-                return false;
+            var serializedObject = new SerializedObject(blackboardAsset);
+            serializedObject.Update();
 
-            if (valueType.IsGenericType && valueType.GetGenericTypeDefinition() == typeof(List<>))
+            var valuesProp = serializedObject.FindProperty(FieldNames.Values);
+            if (valuesProp == null)
             {
-                var oldList = oldValue as System.Collections.IList;
-                var newList = newValue as System.Collections.IList;
-
-                if (oldList == null || newList == null)
-                    return oldList == newList;
-
-                if (oldList.Count != newList.Count)
-                    return false;
-
-                for (int i = 0; i < oldList.Count; i++)
-                {
-                    if (!System.Collections.Generic.EqualityComparer<object>.Default.Equals(oldList[i], newList[i]))
-                        return false;
-                }
-
-                return true;
+                Debug.LogError("Failed to find m_Values property");
+                return;
             }
 
-            return System.Collections.Generic.EqualityComparer<object>.Default.Equals(oldValue, newValue);
+            // Clear existing entries
+            valuesProp.ClearArray();
+
+            // Add all runtime entries using non-generic enumeration
+            foreach (var (key, type, value) in blackboardAsset.Runtime.GetAllEntries())
+            {
+                if (string.IsNullOrEmpty(key))
+                    continue;
+
+                int index = valuesProp.arraySize;
+                valuesProp.arraySize++;
+
+                var entry = BlackboardValuesFactory.CreateEntry(key, type);
+                entry.SetValue(value);
+
+                valuesProp.GetArrayElementAtIndex(index).managedReferenceValue = entry;
+            }
+
+            serializedObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(blackboardAsset);
         }
     }
 }
